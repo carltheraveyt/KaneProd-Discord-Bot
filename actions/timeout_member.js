@@ -5,7 +5,7 @@ module.exports = {
   // This is the name of the action displayed in the editor.
   //---------------------------------------------------------------------
 
-  name: "Leave Voice Channel",
+  name: "Timeout Member",
 
   //---------------------------------------------------------------------
   // Action Section
@@ -13,7 +13,7 @@ module.exports = {
   // This is the section the action will fall into.
   //---------------------------------------------------------------------
 
-  section: "Audio Control",
+  section: "Member Control",
 
   //---------------------------------------------------------------------
   // Action Subtitle
@@ -22,7 +22,7 @@ module.exports = {
   //---------------------------------------------------------------------
 
   subtitle(data, presets) {
-    return "The bot leaves voice channel.";
+    return `${presets.getMemberText(data.member, data.varName)}`;
   },
 
   //---------------------------------------------------------------------
@@ -45,7 +45,7 @@ module.exports = {
   // are also the names of the fields stored in the action's JSON data.
   //---------------------------------------------------------------------
 
-  fields: [],
+  fields: ["member", "varName", "time", "reason"],
 
   //---------------------------------------------------------------------
   // Command HTML
@@ -59,7 +59,20 @@ module.exports = {
   //---------------------------------------------------------------------
 
   html(isEvent, data) {
-    return "";
+    return `
+<member-input dropdownLabel="Member" selectId="member" variableContainerId="varNameContainer" variableInputId="varName"></member-input>
+
+<br><br><br>
+
+<div style="padding-top: 8px;">
+  <span class="dbminputlabel">Time</span><br>
+  <input id="time" class="round" placeholder="Insert the time in seconds here..." type="text">
+</div>
+
+<div style="padding-top: 16px;">
+  <span class="dbminputlabel">Reason</span><br>
+  <textarea id="reason" class="dbm_monospace" rows="5" placeholder="Insert reason here..." style="white-space: nowrap; resize: none;"></textarea>
+</div>`;
   },
 
   //---------------------------------------------------------------------
@@ -81,10 +94,25 @@ module.exports = {
   //---------------------------------------------------------------------
 
   action(cache) {
-    const server = cache.server;
-    const { Audio } = this.getDBM();
-    if (server) Audio.disconnectFromVoice(server);
-    this.callNextAction(cache);
+    const data = cache.actions[cache.index];
+    const type = parseInt(data.member, 10);
+    const varName = this.evalMessage(data.varName, cache);
+    const member = this.getMember(type, varName, cache);
+    let time = this.evalMessage(data.time, cache);
+    time = time ? Date.now() + time * 1000 : null;
+    const reason = this.evalMessage(data.reason, cache);
+
+    if (Array.isArray(member)) {
+      this.callListFunc(member, "disableCommunicationUntil", [time, reason])
+        .then(() => this.callNextAction(cache))
+        .catch((err) => this.displayError(data, cache, err));
+    } else if (member?.disableCommunicationUntil) {
+      member.disableCommunicationUntil(time, reason)
+        .then(() => this.callNextAction(cache))
+        .catch((err) => this.displayError(data, cache, err));
+    } else {
+      this.callNextAction(cache);
+    }
   },
 
   //---------------------------------------------------------------------
