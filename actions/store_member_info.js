@@ -163,7 +163,7 @@ module.exports = {
   // This will make it so the patch version (0.0.X) is not checked.
   //---------------------------------------------------------------------
 
-  meta: { version: "2.0.10", preciseCheck: true, author: null, authorUrl: null, downloadUrl: null },
+  meta: { version: "2.1.0", preciseCheck: true, author: null, authorUrl: null, downloadUrl: null },
 
   //---------------------------------------------------------------------
   // Action Fields
@@ -258,14 +258,15 @@ module.exports = {
 
   async action(cache) {
     const data = cache.actions[cache.index];
-    const memberStorage = parseInt(data.member, 10);
-    const varName = this.evalMessage(data.varName, cache);
-    const info = parseInt(data.info, 10);
-    const member = this.getMember(memberStorage, varName, cache);
+    const member = await this.getMemberFromData(data.member, data.varName, cache);
+
     if (!member) {
       this.callNextAction(cache);
       return;
     }
+
+    const info = parseInt(data.info, 10);
+
     let result;
     switch (info) {
       case 0:
@@ -316,10 +317,12 @@ module.exports = {
       case 15:
         if (member.presence?.status) {
           const status = member.presence.status;
-          if (status === "online") result = "Online";
-          else if (status === "offline") result = "Offline";
-          else if (status === "idle") result = "Idle";
-          else if (status === "dnd") result = "Do Not Disturb";
+          switch(status) {
+            case "online": { result = "Online"; break; }
+            case "offline": { result = "Offline"; break; }
+            case "idle": { result = "Idle"; break; }
+            case "dnd": { result = "Do Not Disturb"; break; }
+          }
         }
         break;
       case 16:
@@ -379,11 +382,13 @@ module.exports = {
       default:
         break;
     }
+
     if (result !== undefined) {
       const storage = parseInt(data.storage, 10);
       const varName2 = this.evalMessage(data.varName2, cache);
       this.storeValue(result, storage, varName2, cache);
     }
+
     this.callNextAction(cache);
   },
 
